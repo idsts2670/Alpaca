@@ -1,0 +1,13 @@
+# Log files
+*.log
+
+# Environment variables
+.env
+
+# Operating System Files
+.DS_Store
+
+# Python
+*.pyc
+__pycache__/
+
