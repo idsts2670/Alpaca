@@ -1,6 +1,6 @@
 import alpaca_trade_api as tradeapi
 from alpaca_trade_api import REST
-import config
+import Alpaca.Tutorial_Alpaca_API.config as config
 
 api = tradeapi.REST(config.ALPACA_API_KEY_PAPER, config.ALPACA_API_SECRET_KEY_PAPER, base_url=config.ALPACA_BASE_URL)
 

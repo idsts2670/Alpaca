@@ -1,7 +1,7 @@
 import alpaca_trade_api as tradeapi
 import requests
 import json
-import config
+import Alpaca.Tutorial_Alpaca_API.config as config
 
 # api = tradeapi.REST(config.ALPACA_API_KEY_PAPER, config.ALPACA_API_SECRET_KEY_PAPER, base_url=config.ALPACA_BASE_URL)
 ALPACA_BASE_URL = "https://paper-api.alpaca.markets"

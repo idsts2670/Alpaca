@@ -4,6 +4,10 @@ import pandas as pd
 import pytz
 import sys
 import logging
+import time
+
+import os
+from dotenv import load_dotenv
 
 from alpaca_trade_api import Stream
 from alpaca_trade_api.common import URL
@@ -11,8 +15,14 @@ from alpaca_trade_api.rest import TimeFrame
 
 logger = logging.getLogger()
 
-ALPACA_API_KEY = "<key_id>"
-ALPACA_SECRET_KEY = "<secret_key>"
+# Load environment variables from config.env file
+dotenv_path = os.path.join("/Users/satoshiido/Documents/programming/Alpaca/Tutorial_Alpaca_API/", "config.env")
+load_dotenv(dotenv_path)
+
+# ALPACA_API_KEY = "<key_id>"
+# ALPACA_SECRET_KEY = "<secret_key>"
+ALPACA_API_KEY = os.getenv("ALPACA_API_KEY_PAPER")
+ALPACA_SECRET_KEY = os.getenv("ALPACA_API_SECRET_KEY_PAPER")
 
 
 class ScalpAlgo:
@@ -27,16 +37,28 @@ class ScalpAlgo:
         market_open = now.replace(hour=9, minute=30)
         today = now.strftime('%Y-%m-%d')
         tomorrow = (now + pd.Timedelta('1day')).strftime('%Y-%m-%d')
-        while 1:
-            # at inception this results sometimes in api errors. this will work
-            # around it. feel free to remove it once everything is stable
+        while True:
             try:
-                data = api.get_bars(symbol, TimeFrame.Minute, today, tomorrow,
-                                    adjustment='raw').df
+                data = api.get_bars(symbol, TimeFrame.Minute, today, tomorrow, adjustment='raw', feed='iex').df
                 break
-            except:
-                # make sure we get bars
-                pass
+            except alpaca.rest.APIError as e:
+                if 'rate limit' in str(e):
+                    logger.warning('Rate limit hit, sleeping for 60 seconds...')
+                    time.sleep(60)  # sleep for 60 seconds to avoid further rate limit hits
+                else:
+                    logger.error(f"API Error: {e}")
+                    raise e  # for other types of errors, raise the exception
+        # while 1:
+        #     # at inception this results sometimes in api errors. this will work
+        #     # around it. feel free to remove it once everything is stable
+        #     try:
+        #         data = api.get_bars(symbol, TimeFrame.Minute, today, tomorrow,
+        #                             adjustment='raw').df
+        #         break
+        #     except:
+        #         # make sure we get bars
+        #         pass
+        
         bars = data[market_open:]
         self._bars = bars
 
@@ -247,11 +269,27 @@ def main(args):
 
     async def periodic():
         while True:
-            if not api.get_clock().is_open:
-                logger.info('exit as market is not open')
-                sys.exit(0)
-            await asyncio.sleep(30)
-            positions = api.list_positions()
+            try:
+                if not api.get_clock().is_open:
+                    logger.info('Market is closed. Exiting.')
+                    sys.exit(0)
+                
+                await asyncio.sleep(30)
+                positions = api.list_positions()
+            # if not api.get_clock().is_open:
+            #     logger.info('exit as market is not open')
+            #     sys.exit(0)
+            # await asyncio.sleep(30)
+            # positions = api.list_positions()
+    
+            except alpaca.rest.APIError as e:
+                if 'rate limit' in str(e):
+                    logger.warning('Rate limit hit, sleeping for 60 seconds...')
+                    await asyncio.sleep(60)  # Sleep before retrying
+                else:
+                    logger.error(f"API Error: {e}")
+                    raise e
+            
             for symbol, algo in fleet.items():
                 pos = [p for p in positions if p.symbol == symbol]
                 algo.checkup(pos[0] if len(pos) > 0 else None)
@@ -269,6 +307,7 @@ if __name__ == '__main__':
 
     fmt = '%(asctime)s:%(filename)s:%(lineno)d:%(levelname)s:%(name)s:%(message)s'
     logging.basicConfig(level=logging.INFO, format=fmt)
+    # Logs are saved to a file named `console.log`
     fh = logging.FileHandler('console.log')
     fh.setLevel(logging.INFO)
     fh.setFormatter(logging.Formatter(fmt))
